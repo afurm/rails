@@ -1,0 +1,16 @@
+<h1>Посібники Ruby on Rails (<%= @edge ? @edge[0, 7] : @version %>)</h1>
+
+<% if @edge %>
+<p>
+  Це <b>Edge Guides</b>, зібрані з <a href="https://github.com/rails/rails/tree/<%= @edge %>">main@<%= @edge[0, 7] %></a>.
+</p>
+<p>
+  Якщо вам потрібні посібники для стабільної версії,
+  перегляньте <a href="https://guides.rubyonrails.org">https://guides.rubyonrails.org</a>.
+</p>
+<% else %>
+<p>
+  Це нові посібники для Rails 8.2, зібрані на основі <a href="https://github.com/rails/rails/tree/<%= @version %>"><%= @version %></a>.
+  Вони допоможуть швидко почати роботу з Rails і зрозуміти, як усі частини фреймворку працюють разом.
+</p>
+<% end %>

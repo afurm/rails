@@ -1,0 +1,83 @@
+name: Sync Upstream Guides
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch origin and upstream
+        run: |
+          if git remote get-url upstream >/dev/null 2>&1; then
+            git remote set-url upstream https://github.com/rails/rails.git
+          else
+            git remote add upstream https://github.com/rails/rails.git
+          fi
+
+          git fetch origin main
+          git fetch upstream main
+
+      - name: Compute sync metadata
+        id: sync_meta
+        run: |
+          TODAY="$(date -u +%Y%m%d)"
+          BASE_SHA="$(git rev-parse HEAD)"
+          AHEAD_COUNT="$(git rev-list --count HEAD..upstream/main)"
+
+          echo "today=$TODAY" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "ahead_count=$AHEAD_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Stop when no upstream commits are available
+        if: steps.sync_meta.outputs.ahead_count == '0'
+        run: echo "No upstream commits to sync."
+
+      - name: Merge upstream/main into local branch
+        if: steps.sync_meta.outputs.ahead_count != '0'
+        run: git merge --no-ff --no-edit upstream/main
+
+      - name: Build Ukrainian translation delta summary
+        if: steps.sync_meta.outputs.ahead_count != '0'
+        id: delta
+        run: |
+          HEAD_SHA="$(git rev-parse HEAD)"
+          OUT_DIR="${RUNNER_TEMP}/uk-sync"
+          .github/scripts/uk_translation_delta.sh "${{ steps.sync_meta.outputs.base_sha }}" "$HEAD_SHA" "$OUT_DIR"
+
+          DELIM="EOF_$(date +%s)"
+          echo "pr_body<<$DELIM" >> "$GITHUB_OUTPUT"
+          cat "$OUT_DIR/summary.md" >> "$GITHUB_OUTPUT"
+          echo "$DELIM" >> "$GITHUB_OUTPUT"
+
+      - name: Open sync pull request
+        if: steps.sync_meta.outputs.ahead_count != '0'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          branch: sync/upstream-${{ steps.sync_meta.outputs.today }}
+          delete-branch: true
+          commit-message: "chore(guides): sync upstream rails guides (${{ steps.sync_meta.outputs.today }})"
+          title: "chore(guides): sync upstream rails guides (${{ steps.sync_meta.outputs.today }})"
+          body: ${{ steps.delta.outputs.pr_body }}
+          labels: |
+            documentation
+            translation

@@ -1,0 +1,67 @@
+name: Publish Ukrainian Guides
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - guides/source/**
+      - guides/assets/**
+      - guides/rails_guides/**
+      - guides/Rakefile
+      - Gemfile
+      - Gemfile.lock
+      - .github/workflows/publish-uk-guides.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-uk-guides
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_ONLY: default:doc
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install documentation dependencies
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Lint and render Ukrainian guides
+        working-directory: guides
+        run: bundle exec rake guides:generate GUIDES_LANGUAGE=uk GUIDES_LINT=1 ALL=1
+
+      - name: Generate Ukrainian HTML guides
+        working-directory: guides
+        run: bundle exec rake guides:generate:html GUIDES_LANGUAGE=uk ALL=1
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: guides/output/uk
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
