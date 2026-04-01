@@ -1,3 +1,10 @@
+*   Fix `cookies.delete` for scoped cookies that are not part of the current request.
+
+    Explicit cookie scope like `path:` or `domain:` now still emits a deletion
+    header even when the cookie was not sent with the current request.
+
+    *afurm*
+
 *   Add `content_type` option to HTTP authentication methods.
 
     `request_http_basic_authentication`, `request_http_digest_authentication`,

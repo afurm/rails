@@ -402,9 +402,9 @@ module ActionDispatch
       #
       # Returns the value of the cookie, or `nil` if the cookie does not exist.
       def delete(name, options = {})
-        return unless @cookies.has_key? name.to_s
-
         options.symbolize_keys!
+        return unless @cookies.has_key?(name.to_s) || options.present?
+
         handle_options(options)
 
         value = @cookies.delete(name.to_s)
