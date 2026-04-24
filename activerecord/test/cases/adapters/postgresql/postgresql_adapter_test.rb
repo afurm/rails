@@ -320,6 +320,46 @@ module ActiveRecord
         connection&.disconnect!
       end
 
+      def test_schema_search_path_cache_is_cleared_after_rollback
+        old_search_path = @connection.schema_search_path
+        @connection.schema_search_path = "public"
+
+        @connection.transaction do
+          @connection.schema_search_path = "pg_catalog"
+          raise ActiveRecord::Rollback
+        end
+
+        assert_equal "public", @connection.select_value("SHOW search_path")
+
+        @connection.schema_search_path = "pg_catalog"
+        assert_equal "pg_catalog", @connection.select_value("SHOW search_path")
+      ensure
+        @connection.schema_search_path = old_search_path
+      end
+
+      def test_schema_search_path_cache_is_cleared_after_savepoint_rollback
+        old_search_path = @connection.schema_search_path
+        @connection.schema_search_path = "public"
+
+        @connection.transaction do
+          @connection.schema_search_path = "pg_catalog"
+
+          @connection.transaction(requires_new: true) do
+            @connection.schema_search_path = "public"
+            raise ActiveRecord::Rollback
+          end
+
+          assert_equal "pg_catalog", @connection.select_value("SHOW search_path")
+
+          @connection.schema_search_path = "public"
+          assert_equal "public", @connection.select_value("SHOW search_path")
+
+          raise ActiveRecord::Rollback
+        end
+      ensure
+        @connection.schema_search_path = old_search_path
+      end
+
       def test_queries_executed_on_fresh_connection_through_first_select
         reset_connection
 
